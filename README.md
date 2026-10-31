@@ -1,23 +1,44 @@
-# Public Seismic Data Pipeline & Analytics (Technical Exercise)
+# Public Seismic Data Pipeline & Analytics
 
-An end-to-end data pipeline built in Python 3 that programmatically streams global real-time seismic event datasets from a public web server, structures them into an indexed local SQLite relational database, and executes analytical business intelligence reporting.
+An end-to-end pipeline built in Python that streams real-time seismic event datasets from a public web server, structures them into an indexed local SQLite relational database, and executes analytical intelligence reporting.
 
 ## Design & Architecture
 
 ### 1. Data Source Selection
 - **Source:** United States Geological Survey (USGS) Earthquake Hazards Feed (`https://usgs.gov`)
-- **Justification:** This official government dataset is entirely public and unauthenticated, fully meeting the requirement to ingest data without logging in or using API keys. The raw continuous 30-day global CSV logging format dynamically pushes out over 12 MB of rich transactional metrics, meeting the 10 MB structural data footprint constraint.
+- **Justification:** This official government dataset is public and unauthenticated, meeting the requirement to ingest data without logging in or using API keys. The raw global CSV logging format dynamically pushes out over 12 MB of rich transactional metrics, meeting the 10 MB structural data footprint constraint.
 
 ### 2. Relational Schema Structure
 The database (`earthquakes.db`) implements a clean, normalized relational star-schema design to guarantee storage efficiency:
 - `locations`: Dimension table tracking geographical description attributes with unique constraints to avoid string redundancy.
 - `earthquakes`: Fact table managing explicit unique event records, timestamps, magnitude metrics, and depths.
-- **Optimization:** Includes a dedicated index on the `mag` column to significantly accelerate heavy analytical aggregation and ordering queries.
+- **Optimization:** Includes a dedicated index on the `mag` column to accelerate heavy analytical aggregation and ordering queries.
+
+### Visual Entity-Relationship (ER) Diagram
+
+```mermaid
+erDiagram
+    LOCATIONS {
+        int location_id PK
+        string place_name UK
+    }
+    EARTHQUAKES {
+        string event_id PK
+        string time_timestamp
+        real latitude
+        real longitude
+        real depth
+        real mag
+        string mag_type
+        int location_id FK
+    }
+    LOCATIONS ||--o{ EARTHQUAKES : "contains"
+```
 
 ### 3. Pipeline Design & Idempotency
 - **Extraction:** Downloads the raw comma-separated values stream dynamically using `requests` straight into memory buffers.
 - **Idempotency:** Driven by a strict primary key constraint linked to the record's unique USGS identifier (`event_id`). Running the pipeline multiple times safely skips duplicate entries and refreshes data without cluttering metrics.
-- **Compliance:** Per the instructions, the raw `all_month.csv` data layout is never saved in Git; it is streamed entirely on-demand at runtime.
+- **Compliance:** Per the instructions, the raw data layout is never saved in Git; it is streamed entirely on-demand at runtime.
 
 ---
 
@@ -58,7 +79,7 @@ pytest
 
 ---
 
-## Business Insights & Reports
+## Insights & Reports
 When the script finishes running, it outputs a multi-layered matrix addressing 4 core research metrics:
 1. **Question 1 (Pure SQL):** Locates the top 5 highest magnitude earthquakes globally to spot immediate high-risk zones.
 2. **Question 2 (Pure SQL):** Compiles count totals and averages grouped across distinct mechanical measurement scale options (`mag_type`).
