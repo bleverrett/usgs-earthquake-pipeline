@@ -5,7 +5,7 @@ An end-to-end pipeline built in Python that streams real-time seismic event data
 ## Design & Architecture
 
 ### 1. Data Source Selection
-- **Source:** United States Geological Survey (USGS) Earthquake Hazards Feed (`https://usgs.gov`)
+- **Source:** United States Geological Survey (USGS) Earthquake Hazards Feed (`https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv`)
 - **Justification:** This official government dataset is public and unauthenticated, meeting the requirement to ingest data without logging in or using API keys. The raw global CSV logging format dynamically pushes out over 12 MB of rich transactional metrics, meeting the 10 MB structural data footprint constraint.
 
 ### 2. Relational Schema Structure
@@ -34,6 +34,9 @@ erDiagram
     }
     LOCATIONS ||--o{ EARTHQUAKES : "contains"
 ```
+
+#### Database Architecture Diagram
+![Project Schema Diagram](schema_diagram.png)
 
 ### 3. Pipeline Design & Idempotency
 - **Extraction:** Downloads the raw comma-separated values stream dynamically using `requests` straight into memory buffers.
