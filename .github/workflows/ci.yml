@@ -1,6 +1,5 @@
 name: Data Pipeline Continuous Integration
 
-# Trigger this workflow automatically on every git push or pull request to main
 on:
   push:
     branches: [ main ]
@@ -9,35 +8,34 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    # 1. Lock down to ubuntu-24.04 explicitly to clear the migration notice
+    runs-on: ubuntu-24.04
 
     steps:
-    # 1. Pull down the repository code onto the automated runner server
+    # 2. Updated to checkout@v4.2.2 (or checkout@v4 latest tag) to use Node 24 structures
     - name: Checkout Repository Code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v4.2.2
 
-    # 2. Provision an official isolated Python environment path
+    # 3. Updated to setup-python@v5.3.0 (or setup-python@v5 latest tag)
     - name: Set up Python 3.12
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v5.3.0
       with:
         python-version: '3.12'
 
-    # 3. Cache pip dependencies to speed up future automated test runs
+    # 4. Updated to cache@v4.2.0 (or cache@v4 latest tag)
     - name: Cache Pip Packages
-      uses: actions/cache@v4
+      uses: actions/cache@v4.2.0
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
-    # 4. Install your framework application dependencies
     - name: Install Project Dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 5. Run your automated test suite using PyTest
     - name: Execute Automated Unit Tests
       run: |
         pytest
