@@ -88,3 +88,13 @@ When the script finishes running, it outputs a multi-layered matrix addressing 4
 2. **Question 2 (Pure SQL):** Compiles count totals and averages grouped across distinct mechanical measurement scale options (`mag_type`).
 3. **Question 3 (Python Tooling):** Generates an overall magnitude distribution curve chart saved directly onto the hard drive as `earthquake_magnitude_distribution.png`.
 4. **Question 4 (Python Tooling):** Compiles an analytical Pearson scatter plot correlation matrix mapping earthquake depth metrics against their resulting magnitudes, saved as `depth_vs_magnitude.png`.
+
+---
+
+## Upstream Guardrails & Rate Limits
+
+During the implementation and testing of Phase C, the following upstream API constraints and data thresholds were discovered and resolved:
+
+1. **Per-Query Record Ceilings:** The official USGS FDSN Query API enforces a strict global maximum threshold cap of 20,000 records per individual request. Exceeding this ceiling causes the server to truncate the stream mid-transmission and append plain-text HTML error indicators to the response payload.
+2. **Mitigation (Paging & Slicing):** To bypass this barrier and hit the mandatory 10 MB raw data volume requirement, the ingestion engine (`pipeline.py`) was adjusted to chunk historical timelines into six 30-day windows (`limit=20000`). This safely aggregates **13.35 MB raw text payload** in memory entirely beneath the server's single-query caps.
+3. **Rate Limiting Protection:** Back-to-back requests can trigger temporary `429 (Too Many Requests)` rate-limiting window blocks on the public endpoint. The ingestion pipeline implements a deliberate `time.sleep(0.5)` throttle pause between chronological window calls to ensure polite, uninterrupted network extraction.
