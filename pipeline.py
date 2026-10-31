@@ -5,7 +5,7 @@ from io import StringIO
 
 DB_NAME = "earthquakes.db"
 # Tracks an expansive 3-year window targeting M3.5+ events to dynamically compile an 11.5MB+ dataset below row ceilings
-DATA_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query"
+DATA_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv&limit=20000"
 
 def setup_database():
     """Reads schema.sql and prepares clean local SQLite tables."""
