@@ -83,11 +83,12 @@ pytest
 ---
 
 ## Insights & Reports
-When the script finishes running, it outputs a multi-layered matrix addressing 4 core research metrics:
+When the script finishes running, `analysis.py` connects directly to the structured database, processes 4 core research metrics using optimized SQL aggregates and Python tooling, and outputs a clean console summary alongside a polished, standalone asset:
 1. **Question 1 (Pure SQL):** Locates the top 5 highest magnitude earthquakes globally to spot immediate high-risk zones.
 2. **Question 2 (Pure SQL):** Compiles count totals and averages grouped across distinct mechanical measurement scale options (`mag_type`).
 3. **Question 3 (Python Tooling):** Generates an overall magnitude distribution curve chart saved directly onto the hard drive as `earthquake_magnitude_distribution.png`.
 4. **Question 4 (Python Tooling):** Compiles an analytical Pearson scatter plot correlation matrix mapping earthquake depth metrics against their resulting magnitudes, saved as `depth_vs_magnitude.png`.
+- **project_report.html:** A styled, self-contained HTML project report. It dynamically embeds all descriptive data matrices, data science trend observations, and raw matplotlib inline visualizations directly on a single page for instantaneous executive review.
 
 ---
 
