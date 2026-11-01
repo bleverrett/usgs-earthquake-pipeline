@@ -1,10 +1,29 @@
 import os
 import sqlite3
+from pathlib import Path
 import pytest
 from unittest.mock import patch, MagicMock
 
 # Import functions directly from your updated pipeline module
 from pipeline import setup_database, fetch_and_ingest_earthquakes
+from analysis import run_analysis
+
+
+def test_database_setup_works_from_any_working_directory(tmp_path, monkeypatch):
+    """Setup should resolve files relative to the project folder, not the caller's current directory."""
+    import pipeline
+
+    original_cwd = os.getcwd()
+    original_db = pipeline.DB_NAME
+
+    try:
+        monkeypatch.chdir(tmp_path)
+        pipeline.DB_NAME = str(tmp_path / "earthquakes.db")
+        setup_database()
+        assert os.path.exists(tmp_path / "earthquakes.db")
+    finally:
+        os.chdir(original_cwd)
+        pipeline.DB_NAME = original_db
 
 TEST_DB = "test_earthquakes.db"
 
@@ -75,3 +94,46 @@ def test_pipeline_idempotency(mock_get, clean_db):
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM earthquakes;")
         assert cursor.fetchone()[0] == 1
+
+
+def test_analysis_generates_html_report(tmp_path, monkeypatch):
+    """The analysis step should emit a single HTML report that embeds the generated PNGs."""
+    import pipeline
+
+    original_db = pipeline.DB_NAME
+    original_cwd = os.getcwd()
+    report_path = Path(__file__).resolve().parent.parent / "project_report.html"
+
+    try:
+        monkeypatch.chdir(tmp_path)
+        pipeline.DB_NAME = str(tmp_path / "earthquakes.db")
+        setup_database()
+
+        with sqlite3.connect(pipeline.DB_NAME) as conn:
+            conn.execute(
+                "INSERT INTO locations (place_name) VALUES (?)",
+                ("Test Place",)
+            )
+            conn.execute(
+                "INSERT INTO earthquakes (event_id, time_timestamp, latitude, longitude, depth, mag, mag_type, location_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                ("evt-1", "2026-10-15T00:00:00Z", 0.0, 0.0, 100.0, 5.5, "ml", 1)
+            )
+            conn.commit()
+
+        import analysis
+        analysis.DB_NAME = str(tmp_path / "earthquakes.db")
+        analysis.OUTPUT_DIR = Path(tmp_path)
+        analysis.run_analysis()
+
+        assert (tmp_path / "project_report.html").exists()
+        assert (tmp_path / "earthquake_magnitude_distribution.png").exists()
+        assert (tmp_path / "depth_vs_magnitude.png").exists()
+    finally:
+        os.chdir(original_cwd)
+        pipeline.DB_NAME = original_db
+        for path in [tmp_path / "earthquakes.db", tmp_path / "earthquake_magnitude_distribution.png", tmp_path / "depth_vs_magnitude.png", tmp_path / "project_report.html", report_path]:
+            if path.exists():
+                try:
+                    path.unlink()
+                except OSError:
+                    pass

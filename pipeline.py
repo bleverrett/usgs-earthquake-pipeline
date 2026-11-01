@@ -3,15 +3,18 @@ import pandas as pd
 import requests
 from io import StringIO
 import time
+from pathlib import Path
 
-DB_NAME = "earthquakes.db"
+PROJECT_ROOT = Path(__file__).resolve().parent
+DB_NAME = str(PROJECT_ROOT / "earthquakes.db")
 BASE_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv"
+SCHEMA_PATH = PROJECT_ROOT / "schema.sql"
 
 def setup_database():
     """Reads schema.sql and prepares clean local SQLite tables."""
     print("Initializing database schema...")
     with sqlite3.connect(DB_NAME) as conn:
-        with open("schema.sql", "r") as f:
+        with open(SCHEMA_PATH, "r") as f:
             conn.executescript(f.read())
         conn.commit()
 
