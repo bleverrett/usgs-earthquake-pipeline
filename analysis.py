@@ -11,8 +11,8 @@ OUTPUT_DIR = PROJECT_ROOT
 
 def write_html_report(output_dir: Path, q1_df: pd.DataFrame, q2_df: pd.DataFrame, corr_value: float):
     """Create an HTML summary page that includes the generated PNG figures and table results."""
-    q1_table = q1_df.to_html(index=False, classes="dataframe", border=0)
-    q2_table = q2_df.to_html(index=False, classes="dataframe", border=0)
+    q1_table = q1_df.to_html(index=False, classes="dataframe", border=0) if not q1_df.empty else "<p>No data available.</p>"
+    q2_table = q2_df.to_html(index=False, classes="dataframe", border=0) if not q2_df.empty else "<p>No data available.</p>"
 
     report_path = output_dir / "project_report.html"
     html = f"""
@@ -50,7 +50,7 @@ def write_html_report(output_dir: Path, q1_df: pd.DataFrame, q2_df: pd.DataFrame
         </div>
 
         <div class="panel">
-            <h2>Magnitude Type Summary</h2>
+            <h2>Tectonic Boundary Zone Summary</h2>
             {q2_table}
         </div>
 
@@ -82,6 +82,11 @@ def write_html_report(output_dir: Path, q1_df: pd.DataFrame, q2_df: pd.DataFrame
 def run_analysis():
     print("\nConnecting to database framework to isolate reporting metrics...")
     
+    # Initialize placeholder DataFrames to safely prevent NameErrors during HTML compilation fallbacks
+    q1_df = pd.DataFrame()
+    q2_df = pd.DataFrame()
+    corr_value = 0.0
+
     with sqlite3.connect(DB_NAME) as conn:
         # Check database rows
         check_df = pd.read_sql_query("SELECT COUNT(*) as count FROM earthquakes;", conn)
@@ -101,23 +106,41 @@ def run_analysis():
             ORDER BY e.mag DESC
             LIMIT 5;
         """
-        q1_df = pd.read_sql_query(sql_q1, conn)
-        print(q1_df.to_string(index=False))
+        try:
+            q1_df = pd.read_sql_query(sql_q1, conn)
+            print(q1_df.to_string(index=False))
+        except Exception as e:
+            print(f"[ERROR] SQL Query 1 failed: {e}")
 
         # -----------------------------------------------------------------
-        # Question 2 (Pure SQL): Counts and Averages by Magnitude Type
+        # Question 2 (Pure SQL): Tectonic Boundary Zone Risk Analysis
         # -----------------------------------------------------------------
-        print("\n--- Question 2: Seismic Activity Summary by Measurement Scale Type (Pure SQL) ---")
+        print("\n--- Question 2: Seismic Concentration by Tectonic Zone (Pure SQL) ---")
         sql_q2 = """
-            SELECT mag_type, COUNT(*) as total_events, ROUND(AVG(mag), 2) as average_magnitude
-            FROM earthquakes
-            WHERE mag_type IS NOT NULL AND mag_type != ''
-            GROUP BY mag_type
-            ORDER BY total_events DESC
-            LIMIT 5;
+            SELECT 
+                CASE 
+                    WHEN l.place_name LIKE '%CA%' OR l.place_name LIKE '%California%' THEN 'California Coast'
+                    WHEN l.place_name LIKE '%AK%' OR l.place_name LIKE '%Alaska%' THEN 'Alaska Fault System'
+                    WHEN l.place_name LIKE '%Japan%' THEN 'Japan Trench'
+                    WHEN l.place_name LIKE '%Indonesia%' THEN 'Sunda Megathrust (Indonesia)'
+                    WHEN l.place_name LIKE '%Hawaii%' THEN 'Hawaii Hotspot'
+                    WHEN l.place_name LIKE '%Puerto Rico%' THEN 'Puerto Rico Trench'
+                    ELSE 'Other Global Tectonic Zones'
+                END as seismic_zone,
+                COUNT(e.event_id) as total_logged_events,
+                ROUND(AVG(e.mag), 2) as average_magnitude,
+                ROUND(MAX(e.mag), 1) as peak_magnitude
+            FROM earthquakes e
+            INNER JOIN locations l ON e.location_id = l.location_id
+            WHERE e.mag IS NOT NULL
+            GROUP BY seismic_zone
+            ORDER BY total_logged_events DESC;
         """
-        q2_df = pd.read_sql_query(sql_q2, conn)
-        print(q2_df.to_string(index=False))
+        try:
+            q2_df = pd.read_sql_query(sql_q2, conn)
+            print(q2_df.to_string(index=False))
+        except Exception as e:
+            print(f"[ERROR] SQL Query 2 failed: {e}")
 
         # -----------------------------------------------------------------
         # Question 3 (Python Tooling): Overall Magnitude Frequency Distribution
@@ -157,9 +180,12 @@ def run_analysis():
             corr_value = float(corr_value) if pd.notna(corr_value) else 0.0
             print(f"Calculated Depth/Magnitude Correlation: {corr_value:.2f}")
 
-            write_html_report(OUTPUT_DIR, q1_df, q2_df, corr_value)
         except Exception as e:
             print(f"[ERROR] Plotting Question 4 failed: {e}")
+
+    # Safely write the HTML report with everything correctly defined
+    write_html_report(OUTPUT_DIR, q1_df, q2_df, corr_value)
+
 
 if __name__ == "__main__":
     run_analysis()
