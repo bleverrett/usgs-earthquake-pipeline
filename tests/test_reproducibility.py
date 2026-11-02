@@ -37,12 +37,25 @@ def test_unclosed_csv_quote_is_reported():
         ("evt,2026-10-31T00:00:00Z,,2,3,4,ml,Place", "missing coordinates"),
         ("evt,2026-10-31T00:00:00Z,1,181,3,4,ml,Place", "longitude out of range"),
         ("evt,2026-10-31T00:00:00Z,1,2,inf,4,ml,Place", "number must be finite"),
+        ("evt,2026-10-31T00:00:00,1,2,3,4,ml,Place", "invalid event time"),
     ],
 )
 def test_invalid_rows_have_explicit_rejection_reasons(row, reason):
     records, rejected = pipeline._parse_csv_chunk(HEADER + row + "\n", "test window")
     assert records == []
     assert rejected == {reason: 1}
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("2026-10-31T13:10:08.987Z", "2026-10-31T13:10:08.987Z"),
+        ("2026-10-31T13:10:08Z", "2026-10-31T13:10:08.000Z"),
+        ("2026-10-31T08:10:08-05:00", "2026-10-31T13:10:08.000Z"),
+    ],
+)
+def test_event_times_are_normalized_to_utc(raw, expected):
+    assert pipeline._normalize_event_time(raw) == expected
 
 
 def test_missing_optional_csv_columns_are_null():
