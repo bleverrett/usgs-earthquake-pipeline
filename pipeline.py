@@ -91,6 +91,18 @@ def _clean_text(value):
     return str(value).strip()
 
 
+def _normalize_event_time(value):
+    """Parse a timezone-aware event time and return it in UTC with milliseconds."""
+    parsed = datetime.fromisoformat(_clean_text(value).replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("event time must include a timezone")
+    return (
+        parsed.astimezone(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
+
+
 def _parse_optional_float(value):
     text = _clean_text(value)
     if not text:
@@ -131,7 +143,7 @@ def _parse_csv_chunk(chunk_text, window):
                     reason = "missing event time"
                 else:
                     try:
-                        datetime.fromisoformat(event_time.replace("Z", "+00:00"))
+                        event_time = _normalize_event_time(event_time)
                     except ValueError:
                         reason = "invalid event time"
 
