@@ -1,8 +1,15 @@
 *.db
 venv/
 .venv/
+.venv-lock/
 __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
 file_versions/
+.pytest_cache/
+.pytest-tmp/
+.coverage
+coverage.xml
+htmlcov/
+docker-output/

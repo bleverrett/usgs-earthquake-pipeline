@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -7,9 +8,34 @@ import webbrowser
 PROJECT_ROOT = Path(__file__).resolve().parent
 DB_NAME = str(PROJECT_ROOT / "earthquakes.db")
 OUTPUT_DIR = PROJECT_ROOT
+SIX_MONTH_FILTER = "datetime(e.time_timestamp) >= datetime('now', '-6 months')"
+
+SEISMIC_ZONE_CASE = """
+    CASE
+        WHEN e.latitude IS NULL OR e.longitude IS NULL THEN 'Unknown coordinates'
+        WHEN e.latitude BETWEEN 32 AND 42 AND e.longitude BETWEEN -125 AND -114
+            THEN 'California Coast'
+        WHEN e.latitude BETWEEN 51 AND 72 AND e.longitude BETWEEN -180 AND -129
+            THEN 'Alaska and Aleutian Region'
+        WHEN e.latitude BETWEEN 24 AND 46 AND e.longitude BETWEEN 122 AND 146
+            THEN 'Japan Region'
+        WHEN e.latitude BETWEEN -11 AND 7 AND e.longitude BETWEEN 95 AND 141
+            THEN 'Indonesia Region'
+        WHEN e.latitude BETWEEN 18 AND 23 AND e.longitude BETWEEN -161 AND -154
+            THEN 'Hawaii Region'
+        WHEN e.latitude BETWEEN 17 AND 20 AND e.longitude BETWEEN -68 AND -64
+            THEN 'Puerto Rico Region'
+        ELSE 'Other / Unclassified'
+    END
+"""
 
 
-def write_html_report(output_dir: Path, q1_df: pd.DataFrame, q2_df: pd.DataFrame, corr_value: float):
+def write_html_report(
+    output_dir: Path,
+    q1_df: pd.DataFrame,
+    q2_df: pd.DataFrame,
+    corr_value: float | None,
+):
     """Create an HTML summary page that includes the generated PNG figures and table results."""
     q1_table = q1_df.to_html(index=False, classes="dataframe", border=0) if not q1_df.empty else "<p>No data available.</p>"
     q2_table = q2_df.to_html(index=False, classes="dataframe", border=0) if not q2_df.empty else "<p>No data available.</p>"
@@ -40,17 +66,18 @@ def write_html_report(output_dir: Path, q1_df: pd.DataFrame, q2_df: pd.DataFrame
 
         <div class="panel">
             <h2>Summary</h2>
-            <p class="metric">Depth/Magnitude Correlation: {corr_value:.2f}</p>
-            <p>This report combines the database queries and generated chart outputs for the latest earthquake dataset loaded by the pipeline.</p>
+            <p class="metric">Depth/Magnitude Correlation: {f"{corr_value:.2f}" if corr_value is not None else "N/A"}</p>
+            <p>All analytics cover the latest six calendar months (UTC).</p>
         </div>
 
         <div class="panel">
-            <h2>Most Dangerous Earthquakes</h2>
+            <h2>Top 5 Earthquakes by Magnitude (Latest Six Months)</h2>
             {q1_table}
         </div>
 
         <div class="panel">
-            <h2>Tectonic Boundary Zone Summary</h2>
+            <h2>Seismic Activity by Approximate Geographic Region</h2>
+            <p>Regions are approximate latitude/longitude bounding boxes, not authoritative tectonic plate or fault boundaries. Events outside these boxes are reported as other or unclassified.</p>
             {q2_table}
         </div>
 
@@ -85,9 +112,9 @@ def run_analysis():
     # Initialize placeholder DataFrames to safely prevent NameErrors during HTML compilation fallbacks
     q1_df = pd.DataFrame()
     q2_df = pd.DataFrame()
-    corr_value = 0.0
+    corr_value = None
 
-    with sqlite3.connect(DB_NAME) as conn:
+    with closing(sqlite3.connect(DB_NAME)) as conn:
         # Check database rows
         check_df = pd.read_sql_query("SELECT COUNT(*) as count FROM earthquakes;", conn)
         if check_df['count'].iloc[0] == 0:
@@ -98,56 +125,46 @@ def run_analysis():
         # Question 1 (Pure SQL): What Are The Top 5 Most Dangerous Earthquake Locations In The Last 6 Months
         # -----------------------------------------------------------------
         print("\n--- Question 1: What Are The Top 5 Most Dangerous Earthquake Locations In The Last 6 Months (Pure SQL) ---")
-        sql_q1 = """
+        sql_q1 = f"""
             SELECT l.place_name, e.mag, e.depth, e.time_timestamp
             FROM earthquakes e
             JOIN locations l ON e.location_id = l.location_id
             WHERE e.mag IS NOT NULL
-            ORDER BY e.mag DESC
+                AND {SIX_MONTH_FILTER}
+            ORDER BY e.mag DESC, e.time_timestamp DESC, e.event_id
             LIMIT 5;
         """
-        try:
-            q1_df = pd.read_sql_query(sql_q1, conn)
-            print(q1_df.to_string(index=False))
-        except Exception as e:
-            print(f"[ERROR] SQL Query 1 failed: {e}")
+        q1_df = pd.read_sql_query(sql_q1, conn)
+        print(q1_df.to_string(index=False))
 
         # -----------------------------------------------------------------
         # Question 2 (Pure SQL): Tectonic Boundary Zone Risk Analysis
         # -----------------------------------------------------------------
-        print("\n--- Question 2: Seismic Concentration by Tectonic Zone (Pure SQL) ---")
-        sql_q2 = """
+        print("\n--- Question 2: Seismic Concentration by Approximate Region (Pure SQL) ---")
+        sql_q2 = f"""
             SELECT 
-                CASE 
-                    WHEN l.place_name LIKE '%CA%' OR l.place_name LIKE '%California%' THEN 'California Coast'
-                    WHEN l.place_name LIKE '%AK%' OR l.place_name LIKE '%Alaska%' THEN 'Alaska Fault System'
-                    WHEN l.place_name LIKE '%Japan%' THEN 'Japan Trench'
-                    WHEN l.place_name LIKE '%Indonesia%' THEN 'Sunda Megathrust (Indonesia)'
-                    WHEN l.place_name LIKE '%Hawaii%' THEN 'Hawaii Hotspot'
-                    WHEN l.place_name LIKE '%Puerto Rico%' THEN 'Puerto Rico Trench'
-                    ELSE 'Other Global Tectonic Zones'
-                END as seismic_zone,
+                {SEISMIC_ZONE_CASE} as seismic_zone,
                 COUNT(e.event_id) as total_logged_events,
                 ROUND(AVG(e.mag), 2) as average_magnitude,
                 ROUND(MAX(e.mag), 1) as peak_magnitude
             FROM earthquakes e
-            INNER JOIN locations l ON e.location_id = l.location_id
             WHERE e.mag IS NOT NULL
+                AND {SIX_MONTH_FILTER}
             GROUP BY seismic_zone
             ORDER BY total_logged_events DESC;
         """
-        try:
-            q2_df = pd.read_sql_query(sql_q2, conn)
-            print(q2_df.to_string(index=False))
-        except Exception as e:
-            print(f"[ERROR] SQL Query 2 failed: {e}")
+        q2_df = pd.read_sql_query(sql_q2, conn)
+        print(q2_df.to_string(index=False))
 
         # -----------------------------------------------------------------
         # Question 3 (Python Tooling): Overall Magnitude Frequency Distribution
         # -----------------------------------------------------------------
         print("\n--- Question 3: Plotting Overall Magnitude Frequency Distribution (Python Tooling) ---")
+        df_q3 = pd.read_sql_query(
+            f"SELECT mag FROM earthquakes e WHERE mag IS NOT NULL AND {SIX_MONTH_FILTER};",
+            conn,
+        )
         try:
-            df_q3 = pd.read_sql_query("SELECT mag FROM earthquakes WHERE mag IS NOT NULL;", conn)
             plt.figure(figsize=(10, 4))
             plt.hist(df_q3['mag'], bins=25, color='teal', edgecolor='black', alpha=0.8)
             plt.title("Frequency Distribution of Global Earthquake Magnitudes (Past 6 Months)")
@@ -157,16 +174,25 @@ def run_analysis():
             plt.savefig(OUTPUT_DIR / 'earthquake_magnitude_distribution.png')
             plt.close()
             print("[SUCCESS] Distribution curve chart saved as 'earthquake_magnitude_distribution.png'.")
-        except Exception as e:
-            print(f"[ERROR] Plotting Question 3 failed: {e}")
+        finally:
+            plt.close()
 
         # -----------------------------------------------------------------
         # Question 4 (Python Tooling): Seismic Depth vs. Magnitude Correlation
         # -----------------------------------------------------------------
         print("\n--- Question 4: Analyzing Event Depth vs. Magnitude Correlation (Python Tooling) ---")
+        df_q4 = pd.read_sql_query(
+            f"""
+            SELECT depth, mag
+            FROM earthquakes e
+            WHERE depth IS NOT NULL
+                AND mag IS NOT NULL
+                AND {SIX_MONTH_FILTER};
+            """,
+            conn,
+        )
         try:
-            df_q4 = pd.read_sql_query("SELECT depth, mag FROM earthquakes WHERE depth IS NOT NULL AND mag IS NOT NULL;", conn)
-            corr_value = df_q4['depth'].corr(df_q4['mag'])
+            correlation = df_q4["depth"].corr(df_q4["mag"])
             plt.figure(figsize=(10, 5))
             plt.scatter(df_q4['depth'], df_q4['mag'], alpha=0.3, color='purple', s=8)
             plt.title("Seismic Event Depth vs. Resulting Magnitude")
@@ -177,11 +203,12 @@ def run_analysis():
             plt.close()
             print("[SUCCESS] Scatter plot correlation asset saved as 'depth_vs_magnitude.png'.")
             
-            corr_value = float(corr_value) if pd.notna(corr_value) else 0.0
-            print(f"Calculated Depth/Magnitude Correlation: {corr_value:.2f}")
+            corr_value = float(correlation) if pd.notna(correlation) else None
+            result = f"{corr_value:.2f}" if corr_value is not None else "N/A"
+            print(f"Calculated Depth/Magnitude Correlation: {result}")
 
-        except Exception as e:
-            print(f"[ERROR] Plotting Question 4 failed: {e}")
+        finally:
+            plt.close()
 
     # Safely write the HTML report with everything correctly defined
     write_html_report(OUTPUT_DIR, q1_df, q2_df, corr_value)

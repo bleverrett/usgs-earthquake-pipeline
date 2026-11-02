@@ -24,11 +24,11 @@
         <div class="panel">
             <h2>Summary</h2>
             <p class="metric">Depth/Magnitude Correlation: 0.36</p>
-            <p>This report combines the database queries and generated chart outputs for the latest earthquake dataset loaded by the pipeline.</p>
+            <p>All analytics cover the latest six calendar months (UTC).</p>
         </div>
 
         <div class="panel">
-            <h2>Most Dangerous Earthquakes</h2>
+            <h2>Top 5 Earthquakes by Magnitude (Latest Six Months)</h2>
             <table class="dataframe dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -40,16 +40,16 @@
   </thead>
   <tbody>
     <tr>
-      <td>25 km SW of Kablalan, Philippines</td>
-      <td>7.8</td>
-      <td>56.991</td>
-      <td>2026-06-07T23:37:41.970Z</td>
-    </tr>
-    <tr>
       <td>66 km NNW of Ende, Indonesia</td>
       <td>7.8</td>
       <td>10.000</td>
       <td>2026-08-14T21:58:21.561Z</td>
+    </tr>
+    <tr>
+      <td>25 km SW of Kablalan, Philippines</td>
+      <td>7.8</td>
+      <td>56.991</td>
+      <td>2026-06-07T23:37:41.970Z</td>
     </tr>
     <tr>
       <td>12 km WSW of Pitaloza Arriba, Panama</td>
@@ -74,40 +74,59 @@
         </div>
 
         <div class="panel">
-            <h2>Magnitude Type Summary</h2>
+            <h2>Seismic Activity by Approximate Geographic Region</h2>
+            <p>Regions are approximate latitude/longitude bounding boxes, not authoritative tectonic plate or fault boundaries. Events outside these boxes are reported as other or unclassified.</p>
             <table class="dataframe dataframe">
   <thead>
     <tr style="text-align: right;">
-      <th>mag_type</th>
-      <th>total_events</th>
+      <th>seismic_zone</th>
+      <th>total_logged_events</th>
       <th>average_magnitude</th>
+      <th>peak_magnitude</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td>ml</td>
-      <td>44196</td>
-      <td>1.43</td>
+      <td>California Coast</td>
+      <td>22124</td>
+      <td>1.07</td>
+      <td>5.6</td>
     </tr>
     <tr>
-      <td>md</td>
-      <td>16944</td>
-      <td>1.21</td>
+      <td>Alaska and Aleutian Region</td>
+      <td>20104</td>
+      <td>1.53</td>
+      <td>6.5</td>
     </tr>
     <tr>
-      <td>mb</td>
-      <td>7597</td>
-      <td>4.43</td>
+      <td>Other / Unclassified</td>
+      <td>19531</td>
+      <td>2.34</td>
+      <td>7.7</td>
     </tr>
     <tr>
-      <td>mww</td>
-      <td>753</td>
-      <td>5.32</td>
+      <td>Hawaii Region</td>
+      <td>2735</td>
+      <td>1.88</td>
+      <td>6.0</td>
     </tr>
     <tr>
-      <td>mwr</td>
-      <td>192</td>
-      <td>4.23</td>
+      <td>Indonesia Region</td>
+      <td>1752</td>
+      <td>4.55</td>
+      <td>7.8</td>
+    </tr>
+    <tr>
+      <td>Puerto Rico Region</td>
+      <td>1489</td>
+      <td>2.52</td>
+      <td>4.8</td>
+    </tr>
+    <tr>
+      <td>Japan Region</td>
+      <td>569</td>
+      <td>4.48</td>
+      <td>6.9</td>
     </tr>
   </tbody>
 </table>
